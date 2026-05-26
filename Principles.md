@@ -96,7 +96,7 @@ git push origin feature/xxx
 
 ---
 
-# 四、开发纪律
+# 三、开发纪律
 
 ---
 
@@ -197,7 +197,7 @@ Review 内容：
 
 ---
 
-# 六、工程结构纪律
+# 四、工程结构纪律
 
 ---
 
@@ -236,7 +236,7 @@ analytics/
 
 ---
 
-# 七、Issue 管理
+# 五、Issue 管理
 
 ---
 
@@ -259,7 +259,7 @@ git commit -m "feat: add login api (#12)"
 
 ---
 
-# 八、文档纪律
+# 六、文档纪律
 
 ---
 
@@ -277,7 +277,7 @@ README 必须持续更新。
 
 ---
 
-# 九、AI 项目特别纪律
+# 七、AI 项目特别纪律
 
 ---
 
@@ -340,7 +340,7 @@ rag/
 
 ---
 
-# 十一、当前阶段目标（非常重要）
+# 八、当前阶段目标（非常重要）
 
 ---
 
@@ -369,30 +369,10 @@ rag/
 → 教师查看
 ```
 
----
-
-# 十二、推荐工程目录（当前阶段）
 
 ---
 
-```text
-risk-management-project/
-│
-├── frontend/
-├── backend/
-├── docs/
-├── prompts/
-├── database/
-├── scripts/
-├── .github/
-├── .gitignore
-├── README.md
-└── WORKFLOW.md
-```
-
----
-
-# 十三、推荐技术栈（当前阶段）
+# 九、推荐技术栈（当前阶段）
 
 ---
 
@@ -426,7 +406,7 @@ risk-management-project/
 
 ---
 
-# 十四、团队每日 Checklist
+# 十、团队每日 Checklist
 
 ---
 
@@ -463,7 +443,7 @@ risk-management-project/
 
 ---
 
-# 十六、当前项目阶段目标（MVP）
+# 十一、当前项目阶段目标
 
 ---
 
