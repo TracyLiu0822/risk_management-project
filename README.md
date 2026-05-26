@@ -1,4 +1,4 @@
-# finrisk_management_learning_platform
+# risk-management-project
 
 ## 项目简介
 
