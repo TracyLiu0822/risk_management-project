@@ -192,6 +192,17 @@ formatted_context = pipeline.format_for_llm(context)
 返回上下文
 ```
 
+## 今日进展 (2026-05-27)
+
+- 已更新平台提示词以支持基于检索的回答并强制引用来源，相关改动位于 `agents/prompts/tutor_prompt.txt`，提示词现在要求仅使用检索到的上下文并输出来源列表。
+- 新增包入口 `RAG/__init__.py`，确保 `RAG` 目录可被 Python 作为包导入。
+- 对 `agents/tutor_agent.py`、`RAG/retriever.py` 与提示词文件执行了静态语法检查，未发现语法错误。
+
+下一步建议：
+
+- 将 `RAG` 的索引与检索流程纳入单元测试，验证 `retrieve_context` 的稳定性与边界行为。
+- 优化文档分割与重排逻辑，确保返回上下文长度与质量控制。
+
 ## 使用示例
 
 ### 完整的 RAG 工作流

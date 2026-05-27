@@ -243,6 +243,17 @@ Provide a clear, detailed explanation...
 - openai >= 1.3.0
 - pydantic >= 2.0
 
+## 今日进展 (2026-05-27)
+
+- 更新了 `tutor` Agent 的提示词文件（`agents/prompts/tutor_prompt.txt`），提示词已调整为：仅使用检索到的上下文回答并必须带引用来源列表。
+- 对 `tutor_agent.py` 及相关检索模块进行了静态语法检查，未发现错误。
+- 新增 `RAG/__init__.py` 以保证包导入稳定性（与 Agent 的检索逻辑联动）。
+
+建议明日工作：
+
+- 在 `agents` 的测试中添加针对 `TutorAgent` 的集成测试，包含检索上下文为空、多个来源与来源去重的场景。
+- 配合 `RAG` 模块完善上下文格式化与引用映射逻辑。
+
 ## 性能优化
 
 - 批量处理请求以减少 API 调用次数

@@ -262,6 +262,18 @@ pytest --cov=app tests/
 ### 集成流程
 - 上传课程材料 → 分割文本 → 生成嵌入 → 存储向量 → 查询和检索
 
+## 今日进展 (2026-05-27)
+
+- 已更新提示词以支持基于检索的回答并强制引用来源：修改文件 [agents/prompts/tutor_prompt.txt](agents/prompts/tutor_prompt.txt)（改为仅使用检索到的上下文回答并输出来源列表）。
+- 新增 `RAG` 包入口以确保模块可导入：创建文件 [RAG/__init__.py](RAG/__init__.py)。
+- 对相关模块执行了静态语法检查：`agents/tutor_agent.py`、`RAG/retriever.py`、提示词文件，未发现语法错误。
+
+下一步计划：
+
+- 实现并完善 `database.py`（异步连接、会话管理与依赖注入）。
+- 提供 Alembic 配置模板与数据库迁移初始化脚本。
+- 完成 `learning analytics`（教学分析）骨架服务并对接现有数据模型。
+
 ## 部署
 
 ### Docker 部署
