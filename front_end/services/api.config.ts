@@ -2,7 +2,7 @@
 API Configuration for frontend communication
 """
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL?.replace(/\/+$/, '') || 'http://localhost:8000';
 
 export const API_CONFIG = {
   BASE_URL: API_BASE_URL,
@@ -13,6 +13,17 @@ export const API_CONFIG = {
     REGISTER: '/api/v1/auth/register',
     REFRESH: '/api/v1/auth/refresh',
     LOGOUT: '/api/v1/auth/logout',
+    ME: '/api/v1/auth/me',
+  },
+  
+  // Tutor endpoints
+  TUTOR: {
+    LIST: '/api/v1/tutors',
+    DETAIL: (id: number) => `/api/v1/tutors/${id}`,
+    SEARCH: '/api/v1/tutors/search',
+    CREATE: '/api/v1/tutors',
+    UPDATE: (id: number) => `/api/v1/tutors/${id}`,
+    DELETE: (id: number) => `/api/v1/tutors/${id}`,
   },
   
   // Course endpoints

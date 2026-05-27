@@ -7,32 +7,22 @@ from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
+from app.schemas.agent import TutorAskRequest
+from app.utils.response import create_response, error_response
+from app.services.tutor_service import TutorService
 
 router = APIRouter()
 
 
 @router.post("/tutor/ask")
-async def tutor_agent_ask(db: AsyncSession = Depends(get_db)):
-    """
-    Tutor Agent - Answer student questions
-    
-    Capabilities:
-    - Explain course concepts
-    - Solve practice problems
-    - Clarify difficult topics
-    - Provide learning guidance
-    
-    Returns:
-    - Answer with explanation
-    - Related learning resources
-    - Follow-up questions
-    """
-    return {
-        "agent": "tutor",
-        "response": "",
-        "resources": [],
-        "message": "Tutor agent endpoint - implementation pending"
-    }
+async def tutor_agent_ask(payload: TutorAskRequest, db: AsyncSession = Depends(get_db)):
+    """Tutor Agent - Answer student questions"""
+    try:
+        svc = TutorService()
+        answer = await svc.ask(payload.question)
+        return create_response(data={"answer": answer})
+    except Exception as e:
+        return error_response("Tutor agent failed to generate answer")
 
 
 @router.post("/grading/evaluate")

@@ -4,6 +4,7 @@ Environment-based settings using pydantic-settings
 """
 
 from typing import List
+from pydantic import Field
 from pydantic_settings import BaseSettings
 from functools import lru_cache
 
@@ -22,7 +23,10 @@ class Settings(BaseSettings):
     DEBUG: bool = False
     
     # Database Configuration
-    DATABASE_URL: str = "sqlite:///./risk_management.db"
+    # Use async drivers by default for compatibility with SQLAlchemy async engine.
+    # For SQLite use: sqlite+aiosqlite:///./risk_management.db
+    # For PostgreSQL use: postgresql+asyncpg://user:pass@host:port/dbname
+    DATABASE_URL: str = "sqlite+aiosqlite:///./risk_management.db"
     DATABASE_ECHO: bool = False
     
     # CORS Configuration
@@ -34,7 +38,7 @@ class Settings(BaseSettings):
     ]
     
     # Authentication
-    SECRET_KEY: str = "your-secret-key-change-in-production"
+    SECRET_KEY: str = Field(..., env="SECRET_KEY")
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
     REFRESH_TOKEN_EXPIRE_DAYS: int = 7
