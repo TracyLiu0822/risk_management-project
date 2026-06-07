@@ -7,9 +7,11 @@ from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
-from app.dependencies import get_current_user
+from app.dependencies import get_current_student
 from app.models.user import User
+from app.schemas.agent import TutorAskRequest
 from app.services.chat_history_service import ChatService
+from app.services.tutor_service import TutorService
 from app.utils.response import create_response, error_response
 
 router = APIRouter()
@@ -30,7 +32,7 @@ async def get_student_profile(db: AsyncSession = Depends(get_db)):
 async def get_chat_history(
     page: int = Query(1, ge=1),
     size: int = Query(20, ge=1, le=100),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_student),
     db: AsyncSession = Depends(get_db),
 ):
     """Get current user's chat history with pagination."""
@@ -113,15 +115,20 @@ async def get_learning_feedback(db: AsyncSession = Depends(get_db)):
 
 
 @router.post("/ask-tutor")
-async def ask_tutor_question(db: AsyncSession = Depends(get_db)):
-    """
-    Ask AI tutor a question
-    
-    Triggers:
-    - tutor_agent
-    - Question-answering service
-    """
-    return {
-        "response": "",
-        "message": "Ask tutor endpoint - implementation pending"
-    }
+async def ask_tutor_question(
+    payload: TutorAskRequest,
+    current_user: User = Depends(get_current_student),
+    db: AsyncSession = Depends(get_db),
+):
+    """Ask the grounded tutor and persist the complete exchange."""
+    try:
+        result = await TutorService().ask(payload.question)
+        chat = await ChatService(db).create_chat_history(
+            user_id=current_user.id,
+            question=payload.question,
+            answer=result["answer"],
+            sources=result["sources"],
+        )
+        return create_response(data={**result, "chat_id": chat.id})
+    except Exception:
+        return error_response("Could not generate tutor answer", status_code=500)

@@ -3,12 +3,31 @@ Teacher Routes
 Class management, student analytics, grading, teaching insights
 """
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
+from app.dependencies import get_current_teacher
+from app.models.user import User
+from app.services.chat_history_service import ChatService
+from app.utils.response import create_response, error_response
 
 router = APIRouter()
+
+
+@router.get("/chat-history")
+async def get_student_chat_history(
+    page: int = Query(1, ge=1),
+    size: int = Query(20, ge=1, le=100),
+    current_user: User = Depends(get_current_teacher),
+    db: AsyncSession = Depends(get_db),
+):
+    """Allow teachers to review student tutor conversations."""
+    try:
+        history = await ChatService(db).get_all_chat_history(page=page, size=size)
+        return create_response(data=history.model_dump())
+    except Exception:
+        return error_response("Could not retrieve student chat history", status_code=500)
 
 
 @router.get("/profile")

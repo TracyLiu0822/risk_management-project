@@ -1,7 +1,3 @@
-/**
- * Common API response contracts shared between frontend and backend.
- */
-
 export interface ApiResponse<T> {
   success: boolean;
   data: T;
@@ -13,8 +9,8 @@ export interface PaginatedResponse<T> {
   items: T[];
   total: number;
   page: number;
-  page_size: number;
-  total_pages: number;
+  size: number;
+  pages: number;
 }
 
 export interface LoginRequest {
@@ -22,13 +18,43 @@ export interface LoginRequest {
   password: string;
 }
 
-export interface LoginResponse<User> {
-  user: User;
+export interface RegisterRequest extends LoginRequest {
+  role: 'student' | 'teacher';
+  teacher_code?: string;
+}
+
+export interface TokenResponse {
+  access_token: string;
+  refresh_token: string;
+  token_type: 'bearer';
+  expires_in: number;
 }
 
 export interface UserProfile {
-  id: number;
+  id: string;
   email: string;
-  name: string;
-  role: 'student' | 'teacher' | 'admin';
+  role: 'student' | 'teacher';
+  created_at: string;
+}
+
+export interface TutorSource {
+  source_id: string;
+  title: string;
+  relevance_score: number;
+}
+
+export interface TutorAnswer {
+  answer: string;
+  sources: TutorSource[];
+  chat_id: string;
+}
+
+export interface ChatHistoryItem {
+  id: string;
+  user_id: string;
+  student_email?: string;
+  question: string;
+  answer: string;
+  sources: TutorSource[];
+  created_at: string;
 }

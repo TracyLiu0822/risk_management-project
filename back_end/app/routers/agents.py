@@ -7,7 +7,10 @@ from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
+from app.dependencies import get_current_student
+from app.models.user import User
 from app.schemas.agent import TutorAskRequest
+from app.services.chat_history_service import ChatService
 from app.utils.response import create_response, error_response
 from app.services.tutor_service import TutorService
 
@@ -15,14 +18,27 @@ router = APIRouter()
 
 
 @router.post("/tutor/ask")
-async def tutor_agent_ask(payload: TutorAskRequest, db: AsyncSession = Depends(get_db)):
+async def tutor_agent_ask(
+    payload: TutorAskRequest,
+    current_user: User = Depends(get_current_student),
+    db: AsyncSession = Depends(get_db),
+):
     """Tutor Agent - Answer student questions"""
     try:
         svc = TutorService()
-        answer = await svc.ask(payload.question)
-        return create_response(data={"answer": answer})
-    except Exception as e:
-        return error_response("Tutor agent failed to generate answer")
+        result = await svc.ask(payload.question)
+        chat = await ChatService(db).create_chat_history(
+            user_id=current_user.id,
+            question=payload.question,
+            answer=result["answer"],
+            sources=result["sources"],
+        )
+        return create_response(data={**result, "chat_id": chat.id})
+    except Exception:
+        return error_response(
+            "Tutor agent failed to generate answer",
+            status_code=500,
+        )
 
 
 @router.post("/grading/evaluate")
@@ -103,8 +119,8 @@ async def get_agents_status(db: AsyncSession = Depends(get_db)):
     return {
         "agents": {
             "tutor": "operational",
-            "grading": "operational",
-            "quiz": "operational",
-            "teaching": "operational"
+            "grading": "planned",
+            "quiz": "planned",
+            "teaching": "planned"
         }
     }

@@ -1,47 +1,34 @@
-import axios, { AxiosInstance, AxiosRequestConfig, AxiosError, AxiosResponse } from 'axios';
+import axios, {
+  AxiosError,
+  AxiosInstance,
+  AxiosRequestConfig,
+  AxiosResponse,
+  InternalAxiosRequestConfig,
+} from 'axios';
+
 import API_CONFIG from './api.config';
-import type { ApiResponse } from '../types/api';
+import type { ApiResponse, TokenResponse } from '../types/api';
 
-export enum ApiErrorType {
-  Network = 'NETWORK_ERROR',
-  Http = 'HTTP_ERROR',
-  Business = 'BUSINESS_ERROR',
-}
-
-export class ApiError extends Error {
-  public readonly type: ApiErrorType;
-  public readonly status?: number;
-  public readonly payload?: unknown;
-
-  constructor(message: string, type: ApiErrorType, status?: number, payload?: unknown) {
-    super(message);
-    this.type = type;
-    this.status = status;
-    this.payload = payload;
-  }
-}
-
-export class NetworkError extends ApiError {
-  constructor(message: string, payload?: unknown) {
-    super(message, ApiErrorType.Network, undefined, payload);
-  }
-}
-
-export class HttpError extends ApiError {
-  constructor(message: string, status: number, payload?: unknown) {
-    super(message, ApiErrorType.Http, status, payload);
-  }
-}
-
-export class BusinessError extends ApiError {
-  constructor(message: string, payload?: unknown) {
-    super(message, ApiErrorType.Business, undefined, payload);
-  }
-}
+const ACCESS_TOKEN_KEY = 'risk_access_token';
+const REFRESH_TOKEN_KEY = 'risk_refresh_token';
 
 interface AuthRequestConfig extends AxiosRequestConfig {
   _retry?: boolean;
   skipRefresh?: boolean;
+}
+
+export class ApiError extends Error {
+  constructor(
+    message: string,
+    public readonly status?: number,
+    public readonly payload?: unknown
+  ) {
+    super(message);
+  }
+}
+
+function getStoredToken(key: string): string | null {
+  return typeof window === 'undefined' ? null : window.localStorage.getItem(key);
 }
 
 class APIClient {
@@ -53,71 +40,90 @@ class APIClient {
       baseURL: API_CONFIG.BASE_URL,
       timeout: 30000,
       headers: {
-        'Content-Type': 'application/json',
         Accept: 'application/json',
+        'Content-Type': 'application/json',
       },
-      withCredentials: true,
     });
 
-    this.client.interceptors.request.use(this.handleRequest.bind(this), this.handleRequestError.bind(this));
-    this.client.interceptors.response.use(this.handleResponse.bind(this), this.handleResponseError.bind(this));
+    this.client.interceptors.request.use((config) => this.addAuthorization(config));
+    this.client.interceptors.response.use(
+      (response) => this.validateBusinessResponse(response),
+      (error: AxiosError) => this.handleResponseError(error)
+    );
   }
 
-  private handleRequest(config: AxiosRequestConfig): AxiosRequestConfig {
-    if (!config.headers) {
-      config.headers = {};
+  private addAuthorization(
+    config: InternalAxiosRequestConfig
+  ): InternalAxiosRequestConfig {
+    const accessToken = getStoredToken(ACCESS_TOKEN_KEY);
+    if (accessToken) {
+      config.headers.Authorization = `Bearer ${accessToken}`;
     }
-
-    config.headers['X-Requested-With'] = 'XMLHttpRequest';
     return config;
   }
 
-  private handleRequestError(error: AxiosError): Promise<never> {
-    return Promise.reject(new NetworkError(error.message, error));
-  }
-
-  private handleResponse<T>(response: AxiosResponse<ApiResponse<T>>): AxiosResponse<ApiResponse<T>> {
-    const apiBody = response.data;
-    if (apiBody && apiBody.success === false) {
-      throw new BusinessError(apiBody.error ?? apiBody.message ?? '业务逻辑错误', apiBody);
+  private validateBusinessResponse(
+    response: AxiosResponse<ApiResponse<unknown>>
+  ): AxiosResponse<ApiResponse<unknown>> {
+    if (response.data?.success === false) {
+      throw new ApiError(
+        response.data.message ?? response.data.error ?? '业务请求失败',
+        response.status,
+        response.data
+      );
     }
     return response;
   }
 
   private async handleResponseError(error: AxiosError): Promise<never> {
     if (!error.response) {
-      return Promise.reject(new NetworkError('网络连接失败，请检查您的网络', error));
+      throw new ApiError('网络连接失败，请检查后端服务是否已启动。', undefined, error);
     }
 
     const status = error.response.status;
-    const config = error.config as AuthRequestConfig;
-
-    if (status === 401 && !config.skipRefresh && !config._retry) {
+    const config = error.config as AuthRequestConfig | undefined;
+    if (status === 401 && config && !config.skipRefresh && !config._retry) {
       const refreshed = await this.refreshAuthentication();
       if (refreshed) {
         config._retry = true;
         return this.client.request(config);
       }
-      return Promise.reject(new HttpError('认证已失效，请重新登录', status, error.response.data));
     }
 
-    return Promise.reject(new HttpError(error.response.statusText || 'HTTP 请求失败', status, error.response.data));
+    const responseBody = error.response.data as Partial<ApiResponse<unknown>> | undefined;
+    throw new ApiError(
+      responseBody?.message ?? error.response.statusText ?? 'HTTP 请求失败',
+      status,
+      error.response.data
+    );
   }
 
   private async refreshAuthentication(): Promise<boolean> {
+    const refreshToken = getStoredToken(REFRESH_TOKEN_KEY);
+    if (!refreshToken) {
+      return false;
+    }
     if (this.refreshPromise) {
       return this.refreshPromise;
     }
 
     this.refreshPromise = this.client
-      .post<ApiResponse<unknown>>(API_CONFIG.AUTH.REFRESH, {}, { skipRefresh: true })
+      .post<ApiResponse<TokenResponse>>(
+        API_CONFIG.AUTH.REFRESH,
+        { refresh_token: refreshToken },
+        { skipRefresh: true } as AuthRequestConfig
+      )
       .then((response) => {
-        this.refreshPromise = null;
-        return response.data.success !== false;
+        const tokens = response.data.data;
+        if (!response.data.success || !tokens) {
+          return false;
+        }
+        this.setTokens(tokens.access_token, tokens.refresh_token);
+        return true;
       })
-      .catch(() => {
+      .catch(() => false)
+      .finally(() => {
         this.refreshPromise = null;
-        return false;
       });
 
     return this.refreshPromise;
@@ -125,27 +131,37 @@ class APIClient {
 
   async request<T>(config: AxiosRequestConfig): Promise<T> {
     const response = await this.client.request<ApiResponse<T>>(config);
-    return response.data.data as T;
+    return response.data.data;
   }
 
-  async get<T>(url: string, config?: AxiosRequestConfig): Promise<T> {
-    return this.request<T>({ url, method: 'GET', ...config });
+  get<T>(url: string, config?: AxiosRequestConfig): Promise<T> {
+    return this.request<T>({ ...config, url, method: 'GET' });
   }
 
-  async post<T>(url: string, data?: unknown, config?: AxiosRequestConfig): Promise<T> {
-    return this.request<T>({ url, method: 'POST', data, ...config });
+  post<T>(url: string, data?: unknown, config?: AxiosRequestConfig): Promise<T> {
+    return this.request<T>({ ...config, url, method: 'POST', data });
   }
 
-  async put<T>(url: string, data?: unknown, config?: AxiosRequestConfig): Promise<T> {
-    return this.request<T>({ url, method: 'PUT', data, ...config });
+  put<T>(url: string, data?: unknown, config?: AxiosRequestConfig): Promise<T> {
+    return this.request<T>({ ...config, url, method: 'PUT', data });
   }
 
-  async patch<T>(url: string, data?: unknown, config?: AxiosRequestConfig): Promise<T> {
-    return this.request<T>({ url, method: 'PATCH', data, ...config });
+  delete<T>(url: string, config?: AxiosRequestConfig): Promise<T> {
+    return this.request<T>({ ...config, url, method: 'DELETE' });
   }
 
-  async delete<T>(url: string, config?: AxiosRequestConfig): Promise<T> {
-    return this.request<T>({ url, method: 'DELETE', ...config });
+  setTokens(accessToken: string, refreshToken: string): void {
+    if (typeof window !== 'undefined') {
+      window.localStorage.setItem(ACCESS_TOKEN_KEY, accessToken);
+      window.localStorage.setItem(REFRESH_TOKEN_KEY, refreshToken);
+    }
+  }
+
+  clearTokens(): void {
+    if (typeof window !== 'undefined') {
+      window.localStorage.removeItem(ACCESS_TOKEN_KEY);
+      window.localStorage.removeItem(REFRESH_TOKEN_KEY);
+    }
   }
 }
 

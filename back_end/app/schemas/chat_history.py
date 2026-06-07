@@ -1,8 +1,8 @@
 from __future__ import annotations
 from datetime import datetime
-from typing import Generic, TypeVar
+from typing import Any, Generic, TypeVar
 
-from pydantic import BaseModel, Field, GenericModel
+from pydantic import BaseModel, Field
 
 T = TypeVar("T")
 
@@ -15,14 +15,14 @@ class ChatHistoryCreate(BaseModel):
 class ChatHistoryResponse(BaseModel):
     id: str
     user_id: str
+    student_email: str | None = None
     question: str
     answer: str
+    sources: list[dict[str, Any]] = Field(default_factory=list)
     created_at: datetime
 
-    model_config = {"from_attributes": True}
 
-
-class PaginatedResponse(GenericModel, Generic[T]):
+class PaginatedResponse(BaseModel, Generic[T]):
     items: list[T] = Field(default_factory=list)
     total: int
     page: int

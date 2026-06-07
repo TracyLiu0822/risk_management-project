@@ -30,8 +30,14 @@ AsyncSessionLocal = async_sessionmaker(
 Base = declarative_base()
 
 
+def load_models() -> None:
+    """Import ORM models so Base.metadata contains every table."""
+    from app import models  # noqa: F401
+
+
 async def init_db():
     """Initialize database tables"""
+    load_models()
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
 

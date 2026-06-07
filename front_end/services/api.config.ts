@@ -2,7 +2,7 @@
 API Configuration for frontend communication
 """
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL?.replace(/\/+$/, '') || 'http://localhost:8000';
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL?.replace(/\/+$/, '') || '';
 
 export const API_CONFIG = {
   BASE_URL: API_BASE_URL,
@@ -44,6 +44,7 @@ export const API_CONFIG = {
     SUBMIT_QUIZ: (quizId: number) => `/api/v1/students/submit-quiz/${quizId}`,
     LEARNING_FEEDBACK: '/api/v1/students/learning-feedback',
     ASK_TUTOR: '/api/v1/students/ask-tutor',
+    CHAT_HISTORY: '/api/v1/students/chat-history',
   },
   
   // Teacher endpoints
@@ -57,6 +58,7 @@ export const API_CONFIG = {
     TEACHING_INSIGHTS: '/api/v1/teachers/teaching-insights',
     TEACHING_ASSISTANT: '/api/v1/teachers/ask-teaching-assistant',
     DASHBOARD: '/api/v1/teachers/dashboard',
+    CHAT_HISTORY: '/api/v1/teachers/chat-history',
   },
   
   // Agent endpoints

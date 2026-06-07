@@ -2,7 +2,6 @@ from __future__ import annotations
 from typing import List, Dict, Any, Optional
 import os
 import httpx
-import asyncio
 
 from app.config import settings
 
@@ -48,3 +47,7 @@ class LLMService:
         if not choices:
             return ""
         return choices[0].get("message", {}).get("content", "").strip()
+
+    @property
+    def is_configured(self) -> bool:
+        return bool(self.api_key)

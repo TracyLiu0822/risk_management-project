@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Optional, Dict, Any
 import anyio
 
@@ -54,10 +54,11 @@ async def authenticate_user(db: AsyncSession, email: str, password: str) -> Opti
 
 
 def _create_token_payload(user_id: str, role: str, expires_delta: timedelta) -> Dict[str, Any]:
-    expire = datetime.utcnow() + expires_delta
+    expire = datetime.now(timezone.utc) + expires_delta
     return {
         "user_id": user_id,
         "role": role,
+        "token_type": "access",
         "exp": expire
     }
 
@@ -72,6 +73,21 @@ async def create_access_token(user_id: str, role: str, expires_minutes: Optional
     expires = expires_minutes or settings.ACCESS_TOKEN_EXPIRE_MINUTES
     # encoding is CPU-light; keep sync for jose
     return await anyio.to_thread.run_sync(create_access_token_sync, user_id, role, expires)
+
+
+def create_refresh_token_sync(user_id: str, role: str, expires_days: int) -> str:
+    payload = _create_token_payload(user_id, role, timedelta(days=expires_days))
+    payload["token_type"] = "refresh"
+    return jwt.encode(payload, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
+
+
+async def create_refresh_token(user_id: str, role: str) -> str:
+    return await anyio.to_thread.run_sync(
+        create_refresh_token_sync,
+        user_id,
+        role,
+        settings.REFRESH_TOKEN_EXPIRE_DAYS,
+    )
 
 
 def verify_token_sync(token: str) -> Dict[str, Any]:

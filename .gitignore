@@ -86,6 +86,10 @@ yarn-error.log*
 
 .cache/
 models/
+!back_end/app/models/
+!back_end/app/models/__init__.py
+!back_end/app/models/user.py
+!back_end/app/models/chat_history.py
 checkpoints/
 
 # =========================================

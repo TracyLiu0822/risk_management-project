@@ -1,49 +1,128 @@
-"""检索器模块
+"""Local course-material retrieval used by the MVP tutor flow."""
 
-职责：
-- 执行语义检索
-- 根据用户问题生成检索上下文
-- 提供可配置的 top_k 和相似度阈值
-"""
+from __future__ import annotations
 
-from typing import Dict, List, Optional
+import math
+import re
+from pathlib import Path
+from typing import Any
 
-from .embedding_engine import EmbeddingEngine
-from .vector_store import VectorStore
+from app.config import settings
+
+
+TOKEN_PATTERN = re.compile(r"[\u4e00-\u9fff]|[a-zA-Z0-9_]+")
+SUPPORTED_SUFFIXES = {".md", ".txt"}
 
 
 class Retriever:
+    """Index Markdown/text course materials and rank chunks lexically."""
+
     def __init__(
         self,
-        embedding_engine: EmbeddingEngine,
-        vector_store: VectorStore,
-        top_k: int = 5,
-        similarity_threshold: float = 0.3,
+        material_dir: str | Path | None = None,
+        top_k: int | None = None,
+        similarity_threshold: float | None = None,
+        chunk_size: int = 1200,
+        chunk_overlap: int = 150,
     ) -> None:
-        self.embedding_engine = embedding_engine
-        self.vector_store = vector_store
-        self.top_k = top_k
-        self.similarity_threshold = similarity_threshold
+        self.material_dir = Path(material_dir or settings.COURSE_MATERIAL_DIR)
+        self.top_k = top_k or settings.RAG_TOP_K
+        self.similarity_threshold = (
+            similarity_threshold
+            if similarity_threshold is not None
+            else settings.RAG_MIN_SCORE
+        )
+        self.chunk_size = chunk_size
+        self.chunk_overlap = chunk_overlap
 
-    def retrieve(self, query: str, top_k: Optional[int] = None, similarity_threshold: Optional[float] = None) -> Dict[str, object]:
-        top_k = top_k or self.top_k
-        similarity_threshold = similarity_threshold or self.similarity_threshold
+    @staticmethod
+    def _tokens(text: str) -> set[str]:
+        return {token.lower() for token in TOKEN_PATTERN.findall(text)}
 
-        query_embedding = self.embedding_engine.embed_text(query)
-        hits = self.vector_store.query(query_embedding, top_k=top_k)
-        filtered_hits = [hit for hit in hits if hit["similarity"] >= similarity_threshold]
+    def _split_text(self, text: str) -> list[str]:
+        paragraphs = [part.strip() for part in re.split(r"\n\s*\n", text) if part.strip()]
+        chunks: list[str] = []
+        current = ""
 
-        context_fragments = []
-        for item in filtered_hits:
-            metadata = item.get("metadata", {})
-            context_fragments.append(
-                f"来源: {metadata.get('source', 'unknown')} | chunk_index: {metadata.get('chunk_index')} | similarity: {item['similarity']:.4f}\n{item['content']}"
-            )
+        for paragraph in paragraphs:
+            candidate = f"{current}\n\n{paragraph}".strip()
+            if current and len(candidate) > self.chunk_size:
+                chunks.append(current)
+                current = f"{current[-self.chunk_overlap:]}\n\n{paragraph}".strip()
+            else:
+                current = candidate
+
+        if current:
+            chunks.append(current)
+        return chunks
+
+    def _documents(self) -> list[dict[str, Any]]:
+        if not self.material_dir.exists():
+            return []
+
+        documents: list[dict[str, Any]] = []
+        for path in sorted(self.material_dir.rglob("*")):
+            if not path.is_file() or path.suffix.lower() not in SUPPORTED_SUFFIXES:
+                continue
+
+            text = path.read_text(encoding="utf-8")
+            for index, chunk in enumerate(self._split_text(text), start=1):
+                documents.append(
+                    {
+                        "id": f"{path.name}:{index}",
+                        "content": chunk,
+                        "metadata": {
+                            "source": str(path.relative_to(self.material_dir)),
+                            "title": path.stem.replace("_", " "),
+                            "chunk_index": index,
+                        },
+                    }
+                )
+        return documents
+
+    def _score(self, query: str, content: str) -> float:
+        query_tokens = self._tokens(query)
+        content_tokens = self._tokens(content)
+        if not query_tokens or not content_tokens:
+            return 0.0
+
+        overlap = query_tokens & content_tokens
+        coverage = len(overlap) / len(query_tokens)
+        precision = len(overlap) / math.sqrt(len(content_tokens))
+        phrase_bonus = 0.2 if query.lower() in content.lower() else 0.0
+        return min(1.0, coverage * 0.75 + precision * 0.25 + phrase_bonus)
+
+    def retrieve(
+        self,
+        query: str,
+        top_k: int | None = None,
+        similarity_threshold: float | None = None,
+    ) -> dict[str, object]:
+        selected_top_k = top_k or self.top_k
+        threshold = (
+            similarity_threshold
+            if similarity_threshold is not None
+            else self.similarity_threshold
+        )
+
+        ranked: list[dict[str, Any]] = []
+        for document in self._documents():
+            similarity = self._score(query, document["content"])
+            if similarity >= threshold:
+                ranked.append({**document, "similarity": similarity})
+
+        ranked.sort(key=lambda item: item["similarity"], reverse=True)
+        results = ranked[:selected_top_k]
+        context = "\n\n---\n\n".join(
+            f"来源: {item['metadata']['source']} | "
+            f"相关度: {item['similarity']:.3f}\n{item['content']}"
+            for item in results
+        )
 
         return {
             "query": query,
-            "top_k": top_k,
-            "similarity_threshold": similarity_threshold,
-            "results": filtered_hits,
-            "context": "\n\n---\n\n".join(context_fragments),
+            "top_k": selected_top_k,
+            "similarity_threshold": threshold,
+            "results": results,
+            "context": context,
         }

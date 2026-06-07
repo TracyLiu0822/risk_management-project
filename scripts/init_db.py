@@ -1,26 +1,21 @@
 #!/usr/bin/env python
-"""
-数据库初始化脚本
-"""
+"""Development-only database initialization helper."""
 
 import asyncio
 import sys
 from pathlib import Path
 
-# Add parent directory to path
-sys.path.insert(0, str(Path(__file__).parent.parent))
+ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT))
+sys.path.insert(0, str(ROOT / "back_end"))
 
-async def main():
-    """Initialize database"""
-    from back_end.app.database import init_db
-    
-    try:
-        print("🔄 Initializing database...")
-        await init_db()
-        print("✅ Database initialized successfully!")
-    except Exception as e:
-        print(f"❌ Error: {e}")
-        sys.exit(1)
+
+async def main() -> None:
+    from app.database import init_db
+
+    await init_db()
+    print("Database tables initialized.")
+
 
 if __name__ == "__main__":
     asyncio.run(main())
