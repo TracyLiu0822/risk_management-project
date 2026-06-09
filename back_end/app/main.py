@@ -1,5 +1,7 @@
 """FastAPI application factory and single-site web entry point."""
 
+from __future__ import annotations
+
 from contextlib import asynccontextmanager
 from pathlib import Path
 

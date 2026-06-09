@@ -1,6 +1,4 @@
-"""
-API Configuration for frontend communication
-"""
+// API Configuration for frontend communication
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL?.replace(/\/+$/, '') || '';
 
